@@ -1,0 +1,8 @@
+[package]
+name = "path-of-rust"
+version = "0.1.0"
+edition = "2021"
+description = "CSPB 3112 capstone: a terminal roguelike, built while learning Rust"
+license = "MIT"
+
+[dependencies]
