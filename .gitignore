@@ -1,3 +1,8 @@
+# Agent instruction files stay local, never committed
+AGENTS.md
+CLAUDE.md
+.cursorrules
+
 /target
 **/*.rs.bk
 Thumbs.db
