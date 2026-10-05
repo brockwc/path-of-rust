@@ -8,24 +8,47 @@ use ratatui::{
     DefaultTerminal, Frame, 
 };
 
-// state types
+// player movement
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+// holds player information including starting location,
 struct Player {
     x: u16,
     y: u16,
 }
 
+// this will store game information between when frames are rendered
 struct Game {
     player: Player,
 }
 
 impl Game {
+    // player starts at 20, 10
     fn new() -> Self {
         Self {
             player: Player { x: 20, y: 10 }
         }
     }
+    
+    // apply one move step for the player
+    fn move_player(&mut self, direction: Direction) {
+        let (dx, dy): (i32, i32) = match direction {
+            Direction::Up => (0, -1),
+            Direction::Down => (0, 1),
+            Direction::Left => (-1, 0),
+            Direction::Right => (1, 0),
+        };
+        self.player.x = (i32::from(self.player.x) + dx).max(0) as u16;
+        self.player.y = (i32::from(self.player.y) + dy).max(0) as u16;
+    }
 }
 
+// this draws a frame of the rendering
 fn draw(frame: &mut Frame, game: &Game) {
     let area = frame.area();
     frame.render_widget(
@@ -43,6 +66,7 @@ fn draw(frame: &mut Frame, game: &Game) {
     );
 }
 
+// main game loop: will redraw and wait up to 50ms for a key press or Esc to quit
 fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
     let game = Game::new();
     loop {
