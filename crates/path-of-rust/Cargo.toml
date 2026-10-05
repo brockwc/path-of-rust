@@ -6,3 +6,4 @@ description = "CSPB 3112 capstone: a terminal roguelike, built while learning Ru
 license = "MIT"
 
 [dependencies]
+ratatui = "0.29"
