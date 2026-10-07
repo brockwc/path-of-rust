@@ -105,12 +105,26 @@ fn main() -> io::Result<()> {
     result
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[test]
-//     fn banner_is_set() {
-//         assert_eq!(banner(), "Path of Rust");
-//     }
-// }
+    #[test]
+    fn player_moves_right() {
+        let mut game = Game::new();
+        game.move_player(Direction::Right);
+        assert_eq!(game.player.x, 21);
+    }
+
+    #[test]
+    fn player_stays_on_map() {
+        let mut game = Game {
+            player: Player { x: 0, y: 0 },
+            exit: false,
+        };
+        game.move_player(Direction::Left);
+        game.move_player(Direction::Up);
+        assert_eq!(game.player.x, 0);
+        assert_eq!(game.player.y, 0);
+    }
+}
