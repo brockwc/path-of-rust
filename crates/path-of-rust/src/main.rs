@@ -2,10 +2,10 @@ use std::io;
 use std::time::Duration;
 
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode, KeyEventKind}, 
+    crossterm::event::{self, Event, KeyCode, KeyEventKind},
     style::{Color, Style},
     widgets::Paragraph,
-    DefaultTerminal, Frame, 
+    DefaultTerminal, Frame,
 };
 
 // player movement
@@ -36,7 +36,7 @@ impl Game {
             exit: false,
         }
     }
-    
+
     // apply one move step for the player
     fn move_player(&mut self, direction: Direction) {
         let (dx, dy): (i32, i32) = match direction {
@@ -76,14 +76,14 @@ fn draw(frame: &mut Frame, game: &Game) {
     frame.render_widget(
         Paragraph::new(format!(
             "Path of Rust - step 1: quit with q (terminal {}x{})",
-            area.width, area.height 
-        )), 
+            area.width, area.height
+        )),
         area,
     );
     frame.buffer_mut().set_string(
-        game.player.x, 
-        game.player.y, 
-        "@", 
+        game.player.x,
+        game.player.y,
+        "@",
         Style::new().fg(Color::Green),
     );
 }
