@@ -57,8 +57,8 @@ impl Map {
         let h: i32 = self.height as i32;
 
         // check if out of bounds for x and y
-        if (x >= 0 && x < w &&
-            y >= 0 && y < h) {
+        if  x >= 0 && x < w &&
+            y >= 0 && y < h {
             let (x, y) = (x as u16, y as u16);
             let tile = self.tiles[self.index(x, y)];
             tile == Tile::Floor
@@ -76,15 +76,17 @@ struct Player {
 
 // this will store game information between when frames are rendered
 struct Game {
+    map: Map,
     player: Player,
     exit: bool,
 }
 
 impl Game {
-    // player starts at 20, 10
+    // player starts at 2, 2
     fn new() -> Self {
         Self {
-            player: Player { x: 20, y: 10 },
+            map: Map::new_room(),
+            player: Player { x: 2, y: 2 },
             exit: false,
         }
     }
@@ -97,8 +99,16 @@ impl Game {
             Direction::Left => (-1, 0),
             Direction::Right => (1, 0),
         };
-        self.player.x = (i32::from(self.player.x) + dx).max(0) as u16;
-        self.player.y = (i32::from(self.player.y) + dy).max(0) as u16;
+        
+        //compute the destination
+        let (dest_x, dest_y) = (self.player.x as i32 + dx, self.player.y as i32 + dy);
+        // call is_walkable
+        // if true, move there
+        if self.map.is_walkable(dest_x, dest_y) {
+            self.player.x = dest_x as u16;
+            self.player.y = dest_y as u16;
+        }
+        
     }
 
     // handle pending input from movement keys, 1/Esc to quit
@@ -125,19 +135,58 @@ impl Game {
 // this draws a frame of the rendering
 fn draw(frame: &mut Frame, game: &Game) {
     let area = frame.area();
+
+    // use ratatui to split screen so that game board and header both show
+    let chunks = ratatui::prelude::Layout::default()
+        .direction(ratatui::prelude::Direction::Vertical)
+        .constraints([
+            ratatui::prelude::Constraint::Length(1),  // header row
+            ratatui::prelude::Constraint::Min(0),     // map gets the rest
+        ])
+        .split(area);
+
+    // render header
     frame.render_widget(
         Paragraph::new(format!(
             "Path of Rust - step 1: quit with q (terminal {}x{})",
             area.width, area.height
         )),
-        area,
+        chunks[0],
     );
+
+    // set map area
+    let map_area = chunks[1];
+    
+    // render playable area: walls are white "#", floors are dark grey "." loop over map to set
+    for y in 0..game.map.height {
+        for x in 0..game.map.width {
+            // find tile 
+            let i = game.map.index(x, y);
+            let tile = game.map.tiles[i];
+
+            // set character and color depending on tile type match
+            let (ch, color) = match tile {
+                Tile::Wall => ('#', Color::White),
+                Tile::Floor => ('.', Color::DarkGray),
+            };
+
+            // modify frame
+            frame.buffer_mut().set_string(
+                map_area.x + x, 
+                map_area.y + y, 
+                ch.to_string(), 
+                Style::new().fg(color),
+            );
+        }
+    }
+
     frame.buffer_mut().set_string(
-        game.player.x,
-        game.player.y,
+        map_area.x + game.player.x,
+        map_area.y + game.player.y,
         "@",
         Style::new().fg(Color::Green),
     );
+
 }
 
 // main game loop: will redraw and wait up to 50ms for a key press or Esc to quit
