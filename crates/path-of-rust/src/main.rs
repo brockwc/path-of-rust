@@ -16,6 +16,58 @@ enum Direction {
     Right,
 }
 
+// represent one grid cell in the world
+#[derive(Clone, Copy, PartialEq)]
+enum Tile {
+    Wall,
+    Floor
+}
+
+// grid of tiles with a defined size
+struct Map {
+    width: u16,
+    height: u16,
+    tiles: Vec<Tile>
+}
+
+impl Map {
+    // A 40x20 room: walls around border, floor inside
+    fn new_room() -> Self {
+        let width = 40;
+        let height = 20;
+        let mut tiles = Vec::with_capacity((width * height) as usize);
+        for y in 0..height {
+            for x in 0..width {
+                let border = x == 0 || y == 0 || x == width - 1 || y == height - 1;
+                tiles.push(if border { Tile::Wall } else { Tile::Floor });
+            }
+        }
+        Self { width, height, tiles }
+    }
+
+    // row y begins at index y * width, then x is added to find the precise location
+    fn index(&self, x: u16, y: u16) -> usize {
+        let i: usize = (y * self.width + x) as usize;
+        i
+    }
+
+    // check for OOB positions
+    fn is_walkable(&self, x: i32, y: i32) -> bool {
+        let w: i32 = self.width as i32;
+        let h: i32 = self.height as i32;
+
+        // check if out of bounds for x and y
+        if (x >= 0 && x < w &&
+            y >= 0 && y < h) {
+            let (x, y) = (x as u16, y as u16);
+            let tile = self.tiles[self.index(x, y)];
+            tile == Tile::Floor
+        } else {
+            return false;
+        }
+    }
+}
+
 // holds player information including starting location,
 struct Player {
     x: u16,
