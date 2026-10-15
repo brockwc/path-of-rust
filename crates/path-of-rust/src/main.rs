@@ -20,14 +20,14 @@ enum Direction {
 #[derive(Clone, Copy, PartialEq)]
 enum Tile {
     Wall,
-    Floor
+    Floor,
 }
 
 // grid of tiles with a defined size
 struct Map {
     width: u16,
     height: u16,
-    tiles: Vec<Tile>
+    tiles: Vec<Tile>,
 }
 
 impl Map {
@@ -42,7 +42,11 @@ impl Map {
                 tiles.push(if border { Tile::Wall } else { Tile::Floor });
             }
         }
-        Self { width, height, tiles }
+        Self {
+            width,
+            height,
+            tiles,
+        }
     }
 
     // row y begins at index y * width, then x is added to find the precise location
@@ -57,8 +61,7 @@ impl Map {
         let h: i32 = self.height as i32;
 
         // check if out of bounds for x and y
-        if  x >= 0 && x < w &&
-            y >= 0 && y < h {
+        if x >= 0 && x < w && y >= 0 && y < h {
             let (x, y) = (x as u16, y as u16);
             let tile = self.tiles[self.index(x, y)];
             tile == Tile::Floor
@@ -99,7 +102,7 @@ impl Game {
             Direction::Left => (-1, 0),
             Direction::Right => (1, 0),
         };
-        
+
         //compute the destination
         let (dest_x, dest_y) = (self.player.x as i32 + dx, self.player.y as i32 + dy);
         // call is_walkable
@@ -108,7 +111,6 @@ impl Game {
             self.player.x = dest_x as u16;
             self.player.y = dest_y as u16;
         }
-        
     }
 
     // handle pending input from movement keys, 1/Esc to quit
@@ -140,15 +142,15 @@ fn draw(frame: &mut Frame, game: &Game) {
     let chunks = ratatui::prelude::Layout::default()
         .direction(ratatui::prelude::Direction::Vertical)
         .constraints([
-            ratatui::prelude::Constraint::Length(1),  // header row
-            ratatui::prelude::Constraint::Min(0),     // map gets the rest
+            ratatui::prelude::Constraint::Length(1), // header row
+            ratatui::prelude::Constraint::Min(0),    // map gets the rest
         ])
         .split(area);
 
     // render header
     frame.render_widget(
         Paragraph::new(format!(
-            "Path of Rust - step 1: quit with q (terminal {}x{})",
+            "Path of Rust - move with WASD, quit with q (terminal {}x{})",
             area.width, area.height
         )),
         chunks[0],
@@ -156,11 +158,11 @@ fn draw(frame: &mut Frame, game: &Game) {
 
     // set map area
     let map_area = chunks[1];
-    
+
     // render playable area: walls are white "#", floors are dark grey "." loop over map to set
     for y in 0..game.map.height {
         for x in 0..game.map.width {
-            // find tile 
+            // find tile
             let i = game.map.index(x, y);
             let tile = game.map.tiles[i];
 
@@ -172,9 +174,9 @@ fn draw(frame: &mut Frame, game: &Game) {
 
             // modify frame
             frame.buffer_mut().set_string(
-                map_area.x + x, 
-                map_area.y + y, 
-                ch.to_string(), 
+                map_area.x + x,
+                map_area.y + y,
+                ch.to_string(),
                 Style::new().fg(color),
             );
         }
@@ -186,7 +188,6 @@ fn draw(frame: &mut Frame, game: &Game) {
         "@",
         Style::new().fg(Color::Green),
     );
-
 }
 
 // main game loop: will redraw and wait up to 50ms for a key press or Esc to quit
