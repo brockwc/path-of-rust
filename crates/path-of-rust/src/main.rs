@@ -211,22 +211,68 @@ fn main() -> io::Result<()> {
 mod tests {
     use super::*;
 
+    // -- Updated tests ------------------------------------------------
+
+    // Moving right from the start position: (2,2) is floor, so the move happens.
     #[test]
     fn player_moves_right() {
         let mut game = Game::new();
         game.move_player(Direction::Right);
-        assert_eq!(game.player.x, 21);
+        assert_eq!(game.player.x, 3);
     }
 
+    // A wall stops the player: standing next to the border wall and walking
+    // into it must leave the position unchanged (replaces the old clamp test).
     #[test]
-    fn player_stays_on_map() {
-        let mut game = Game {
-            player: Player { x: 0, y: 0 },
-            exit: false,
-        };
-        game.move_player(Direction::Left);
-        game.move_player(Direction::Up);
-        assert_eq!(game.player.x, 0);
-        assert_eq!(game.player.y, 0);
+    fn wall_blocks_player() {
+        // TODO: build Game with struct literal: map: Map::new_room(),
+        //       player at (1, 2) (floor tile next to the left wall)
+        //       move Left, assert x is still 1 AND y is still 2
+        todo!()
+    }
+
+    // -- New: is_walkable edge cases -----------------------------------------
+
+    // Border tiles are walls, and walls are not walkable. (0,0) is the
+    // top-left corner of the room border.
+    #[test]
+    fn wall_is_not_walkable() {
+        // TODO: let map = Map::new_room(); assert!(!map.is_walkable(0, 0))
+        todo!()
+    }
+
+    // Positions outside the map must be false, not panic. Covers negative
+    // coordinates and coordinates past the right/bottom edges.
+    #[test]
+    fn out_of_bounds_is_not_walkable() {
+        // TODO: let map = Map::new_room();
+        //       assert!(!map.is_walkable(-1, 5))   left of the map
+        //       assert!(!map.is_walkable(100, 5))  right of the map
+        //       assert!(!map.is_walkable(5, -1))   above the map
+        //       assert!(!map.is_walkable(5, 100))  below the map
+        //       (one assert per line is fine, or a loop over a list of
+        //        (x, y) pairs - your call)
+        todo!()
+    }
+
+    // Interior floor tiles ARE walkable - guards against is_walkable
+    // accidentally returning false everywhere (a bug that would look like
+    // "the game works but the player is frozen").
+    #[test]
+    fn floor_is_walkable() {
+        // TODO: let map = Map::new_room(); assert!(map.is_walkable(2, 2))
+        todo!()
+    }
+
+    // -- New: index row-major math -------------------------------------------
+
+    // Row-major indexing: the first tile of row 1 sits exactly one width
+    // (40) into the flat vec. Proves the y * width + x formula.
+    #[test]
+    fn index_starts_of_row_one() {
+        // TODO: let map = Map::new_room();
+        //       assert_eq!(map.index(0, 1), 40)
+        //       (optionally also: index(0, 0) == 0 and index(39, 0) == 39)
+        todo!()
     }
 }
