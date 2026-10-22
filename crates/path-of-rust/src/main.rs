@@ -1,9 +1,8 @@
-use std::arch::x86_64;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng}; // Rng is a trait used to call gen_range() gen_bool()
+                              // SeedableRng provides seed methods
 use std::io;
 use std::time::Duration;
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};   // Rng is a trait used to call gen_range() gen_bool()
-                                // SeedableRng provides seed methods
 
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
@@ -37,7 +36,7 @@ struct Rect {
 
 impl Rect {
     // constructor function for rectangles based on given top left coords
-    fn new(x: u16, y: u16, w:u16, h: u16) -> Self {
+    fn new(x: u16, y: u16, w: u16, h: u16) -> Self {
         Self {
             x1: x,
             y1: y,
@@ -49,7 +48,7 @@ impl Rect {
     // return center coords of rectangle
     fn center(&self) -> (u16, u16) {
         // use top left and bottom right corners to find center
-        ( (self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2 )
+        ((self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2)
     }
 
     // return true if this rectangfle overlaps or touches another one
@@ -185,7 +184,7 @@ impl Map {
                         map.apply_horizontal_tunnel(prev_x, new_x, prev_y);
                         map.apply_vertical_tunnel(prev_y, new_y, new_x);
                     } else {
-                        map.apply_vertical_tunnel(prev_y, new_y, prev_x);                    
+                        map.apply_vertical_tunnel(prev_y, new_y, prev_x);
                         map.apply_horizontal_tunnel(prev_x, new_x, new_y);
                     }
                 }
@@ -215,13 +214,22 @@ struct Game {
 impl Game {
     // player starts at 2, 2
     fn new() -> Self {
-        let (map, (player_x, player_y)) = Map::new_dungeon(80, 20, None);
         Self {
-            map,
-            player: Player { x: player_x, y: player_y },
+            map: Map::new_room(),
+            player: Player { x: 2, y: 2 },
             exit: false,
         }
     }
+
+    // implement when map tests are in place
+    // fn new() -> Self {
+    //     let (map, (player_x, player_y)) = Map::new_dungeon(80, 20, None);
+    //     Self {
+    //         map,
+    //         player: Player { x: player_x, y: player_y },
+    //         exit: false,
+    //     }
+    // }
 
     // apply one move step for the player
     fn move_player(&mut self, direction: Direction) {
