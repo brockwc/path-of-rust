@@ -67,6 +67,7 @@ struct Map {
 
 impl Map {
     // A 40x20 room: walls around border, floor inside
+    #[cfg(test)]
     fn new_room() -> Self {
         let width = 40;
         let height = 20;
