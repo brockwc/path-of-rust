@@ -189,7 +189,7 @@ impl Map {
                         map.apply_horizontal_tunnel(prev_x, new_x, new_y);
                     }
                 }
-                
+
                 rooms.push(new_room);
             }
         }
@@ -215,9 +215,10 @@ struct Game {
 impl Game {
     // player starts at 2, 2
     fn new() -> Self {
+        let (map, (player_x, player_y)) = Map::new_dungeon(80, 20, None);
         Self {
-            map: Map::new_room(),
-            player: Player { x: 2, y: 2 },
+            map,
+            player: Player { x: player_x, y: player_y },
             exit: false,
         }
     }
