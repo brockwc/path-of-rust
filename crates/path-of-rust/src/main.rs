@@ -140,6 +140,63 @@ impl Map {
             self.tiles[idx] = Tile::Floor;
         }
     }
+
+    // generate a dungeon of a given width and height with rooms connected by corridors
+    fn new_dungeon(width: u16, height: u16, seed: Option<u64>) -> (Self, (u16, u16)) {
+        let tiles = vec![Tile::Wall; (width * height) as usize];
+        let mut map = Self {
+            width,
+            height,
+            tiles,
+        };
+
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        let mut rooms: Vec<Rect> = Vec::new();
+        let max_rooms = 30;
+        let min_size = 5;
+        let max_size = 8;
+
+        for _ in 0..max_rooms {
+            let w = rng.gen_range(min_size..=max_size);
+            let h = rng.gen_range(min_size..=max_size);
+            let x = rng.gen_range(1..(width - w - 1));
+            let y = rng.gen_range(1..(height - h - 1));
+
+            // create the new room
+            let new_room = Rect::new(x, y, w, h);
+
+            // check for intersection with other rooms
+            if !rooms.iter().any(|r| r.intersects(&new_room)) {
+                // if no intersection, add the room to the map
+                map.apply_room(&new_room);
+
+                // get center of new room and last room (if there is one)
+                let (new_x, new_y) = new_room.center();
+
+                if !rooms.is_empty() {
+                    let (prev_x, prev_y) = rooms.last().unwrap().center();
+
+                    // draw corridor between new room and existing rooms
+                    if rng.gen_bool(0.5) {
+                        map.apply_horizontal_tunnel(prev_x, new_x, prev_y);
+                        map.apply_vertical_tunnel(prev_y, new_y, new_x);
+                    } else {
+                        map.apply_vertical_tunnel(prev_y, new_y, prev_x);                    
+                        map.apply_horizontal_tunnel(prev_x, new_x, new_y);
+                    }
+                }
+                
+                rooms.push(new_room);
+            }
+        }
+
+        let player_start = rooms[0].center();
+        (map, player_start)
+    }
 }
 
 // holds player information including starting location,
