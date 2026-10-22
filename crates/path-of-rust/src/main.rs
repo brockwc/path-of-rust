@@ -1,3 +1,4 @@
+use std::arch::x86_64;
 use std::io;
 use std::time::Duration;
 use rand::rngs::StdRng;
@@ -102,6 +103,41 @@ impl Map {
             tile == Tile::Floor
         } else {
             false
+        }
+    }
+
+    // carve the interior of a room as Floor tiles.
+    fn apply_room(&mut self, room: &Rect) {
+        // iterates over 'interior' coordinates of room setting it as a floow tile
+        for y in (room.y1 + 1)..room.y2 {
+            for x in (room.x1 + 1)..room.x2 {
+                let idx = self.index(x, y);
+                self.tiles[idx] = Tile::Floor;
+            }
+        }
+    }
+
+    // carve a horizontal tunnel of Floor tiles between x1 and x2 along row y.
+    fn apply_horizontal_tunnel(&mut self, x1: u16, x2: u16, y: u16) {
+        // find bounds
+        let lower = x1.min(x2);
+        let upper = x1.max(x2);
+
+        for x in lower..=upper {
+            let idx = self.index(x, y);
+            self.tiles[idx] = Tile::Floor;
+        }
+    }
+
+    // carve a vertical tunnel of Floor tiles between y1 and y2 along column x
+    fn apply_vertical_tunnel(&mut self, y1: u16, y2: u16, x: u16) {
+        // find bounds
+        let lower = y1.min(y2);
+        let upper = y1.max(y2);
+
+        for y in lower..=upper {
+            let idx = self.index(x, y);
+            self.tiles[idx] = Tile::Floor;
         }
     }
 }
