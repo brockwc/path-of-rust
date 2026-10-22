@@ -218,7 +218,10 @@ impl Game {
         let (map, (player_x, player_y)) = Map::new_dungeon(80, 20, None);
         Self {
             map,
-            player: Player { x: player_x, y: player_y },
+            player: Player {
+                x: player_x,
+                y: player_y,
+            },
             exit: false,
         }
     }
@@ -338,9 +341,8 @@ fn main() -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::vec;
-
-use super::*;
 
     // -- Updated tests ------------------------------------------------
 
@@ -439,7 +441,11 @@ use super::*;
     // is still Wall.
     #[test]
     fn tunnel_carves_floors() {
-        let mut map = Map {width: 20, height: 10, tiles: vec![Tile::Wall; 200] };
+        let mut map = Map {
+            width: 20,
+            height: 10,
+            tiles: vec![Tile::Wall; 200],
+        };
         map.apply_horizontal_tunnel(5, 10, 3);
 
         assert!(map.is_walkable(5, 3));
