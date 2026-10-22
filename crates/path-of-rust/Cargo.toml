@@ -7,3 +7,4 @@ license = "MIT"
 
 [dependencies]
 ratatui = "0.29"
+rand = "0.8"

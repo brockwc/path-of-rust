@@ -1,5 +1,8 @@
 use std::io;
 use std::time::Duration;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};   // Rng is a trait used to call gen_range() gen_bool()
+                                // SeedableRng provides seed methods
 
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
@@ -17,10 +20,45 @@ enum Direction {
 }
 
 // represent one grid cell in the world
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Tile {
     Wall,
     Floor,
+}
+
+// room placement stuff
+struct Rect {
+    x1: u16,
+    y1: u16,
+    x2: u16,
+    y2: u16,
+}
+
+impl Rect {
+    // constructor function for rectangles based on given top left coords
+    fn new(x: u16, y: u16, w:u16, h: u16) -> Self {
+        Self {
+            x1: x,
+            y1: y,
+            x2: x + w,
+            y2: y + h,
+        }
+    }
+
+    // return center coords of rectangle
+    fn center(&self) -> (u16, u16) {
+        // use top left and bottom right corners to find center
+        ( (self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2 )
+    }
+
+    // return true if this rectangfle overlaps or touches another one
+    fn intersects(&self, other: &Rect) -> bool {
+        //
+        if self.x1 <= other.x2 && self.x2 >= other.x1 && self.y1 <= other.y2 && self.y2 >= other.y1 {
+            return true;
+        }
+        false
+    }
 }
 
 // grid of tiles with a defined size
