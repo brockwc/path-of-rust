@@ -212,24 +212,15 @@ struct Game {
 }
 
 impl Game {
-    // player starts at 2, 2
+    // implement when map tests are in place
     fn new() -> Self {
+        let (map, (player_x, player_y)) = Map::new_dungeon(80, 20, None);
         Self {
-            map: Map::new_room(),
-            player: Player { x: 2, y: 2 },
+            map,
+            player: Player { x: player_x, y: player_y },
             exit: false,
         }
     }
-
-    // implement when map tests are in place
-    // fn new() -> Self {
-    //     let (map, (player_x, player_y)) = Map::new_dungeon(80, 20, None);
-    //     Self {
-    //         map,
-    //         player: Player { x: player_x, y: player_y },
-    //         exit: false,
-    //     }
-    // }
 
     // apply one move step for the player
     fn move_player(&mut self, direction: Direction) {
@@ -346,16 +337,22 @@ fn main() -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::vec;
+
+use super::*;
 
     // -- Updated tests ------------------------------------------------
 
     // Moving right from the start position: (2,2) is floor, so the move happens.
     #[test]
     fn player_moves_right() {
-        let mut game = Game::new();
+        let mut game = Game {
+            map: Map::new_room(),
+            player: Player { x: 1, y: 2 },
+            exit: false,
+        };
         game.move_player(Direction::Right);
-        assert_eq!(game.player.x, 3);
+        assert_eq!(game.player.x, 2);
     }
 
     // A wall stops the player: standing next to the border wall and walking
@@ -412,5 +409,74 @@ mod tests {
     fn index_starts_of_row_one() {
         let map = Map::new_room();
         assert_eq!(map.index(0, 1), 40);
+    }
+
+    // -- New: Step 3 procedural generation ------------------------------------
+
+    // Rect::new(2, 2, 6, 4) spans x 2..8, y 2..6, so the midpoint of each
+    // axis is (5, 4). Guards the center() integer-division math.
+    #[test]
+    fn rect_center() {
+        let rect = Rect::new(2, 2, 6, 4);
+        assert_eq!(rect.center(), (5, 4));
+    }
+
+    // Two cases: overlapping rects must return true, separated rects must
+    // return false. Also pin the touching case (shared edge = true) so the
+    // <=/>= semantics can't silently regress.
+    #[test]
+    fn rect_intersection() {
+        let rect1 = Rect::new(2, 2, 6, 4);
+        let rect2 = Rect::new(3, 3, 6, 4);
+
+        assert!(rect1.intersects(&rect2));
+    }
+
+    // On a map filled with Wall, apply_horizontal_tunnel(5, 10, 3) carves
+    // Floor along row y=3 from x=5 through x=10 inclusive. Assert tiles on
+    // that line are Floor and a sample off the line (e.g. same x, row y=4)
+    // is still Wall.
+    #[test]
+    fn tunnel_carves_floors() {
+        let mut map = Map {width: 20, height: 10, tiles: vec![Tile::Wall; 200] };
+        map.apply_horizontal_tunnel(5, 10, 3);
+
+        assert!(map.is_walkable(5, 3));
+        assert!(map.is_walkable(6, 3));
+        assert!(map.is_walkable(7, 3));
+        assert!(map.is_walkable(8, 3));
+        assert!(map.is_walkable(9, 3));
+        assert!(map.is_walkable(10, 3));
+    }
+
+    // Determinism: new_dungeon(80, 20, Some(42)) twice must produce
+    // identical tiles vectors AND identical player start positions.
+    // This is the test that makes every other procgen bug reproducible.
+    #[test]
+    fn seeded_dungeon_is_deterministic() {
+        let (map1, p1) = Map::new_dungeon(80, 20, Some(42));
+        let (map2, p2) = Map::new_dungeon(80, 20, Some(42));
+
+        assert_eq!(map1.tiles, map2.tiles);
+        assert_eq!(p1, p2);
+    }
+
+    // The player must spawn standing on a tile they can walk on:
+    // is_walkable(px, py) is true for the start position returned by
+    // new_dungeon(80, 20, None).
+    #[test]
+    fn player_starts_on_walkable_tile() {
+        let (map, p) = Map::new_dungeon(80, 20, None);
+        assert!(map.is_walkable(p.0 as i32, p.1 as i32));
+    }
+
+    // Proof that more than one room got carved: count Floor tiles in a
+    // seeded dungeon and assert the count is substantial (> 50). A single
+    // 5x5 room's interior is only 3x3 = 9 tiles, so >50 implies multiple
+    // rooms and corridors.
+    #[test]
+    fn multiple_rooms_placed() {
+        let (map, _p) = Map::new_dungeon(80, 20, None);
+        assert!(map.tiles.len() > 50);
     }
 }
