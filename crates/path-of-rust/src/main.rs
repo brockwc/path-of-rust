@@ -199,6 +199,38 @@ impl Map {
     }
 }
 
+// holds player field of view information
+struct Fov {
+    px: u16,
+    py: u16,
+    radius: u16,
+}
+
+impl Fov {
+    // return every tile on a line from point a to b
+    fn line(&self, x0: u16, y0: u16, x1: u16, y1: u16) -> Vec<(u16, u16)> {
+        // convert coords to i32
+        let (mut x, mut y) = (x0 as i32, y0 as i32);
+        let (x1, y1) = (x1 as i32, y1 as i32);
+        // get dx and dy (dy is negative)
+        let dx = (x1 - x).abs();
+        let dy = -(y1 - y).abs();
+        // step direction
+        let sx: i32 = if x < x1 { 1 } else { -1 };
+        let sy: i32 = if y < y1 { 1 } else { -1 };
+
+        let mut err = dx + dy;
+
+        loop {
+            pts.push((x as u16, y as u16));
+            if x == x1 && y == y1 { break; }
+            let e2 = 2 * err;
+            if e2 >= dy { err += dy; x += sx; }
+            if e2 <= dx { err += dx; y += sy }
+        }
+    }
+}
+
 // holds player information including starting location,
 struct Player {
     x: u16,
@@ -210,12 +242,20 @@ struct Game {
     map: Map,
     player: Player,
     exit: bool,
+    // player line of sight
+    visible: Vec<bool>,
+    // has been seen at least once
+    explored: Vec<bool>,
+    // player view radius
+    view_radius: u16,
 }
 
 impl Game {
     // implement when map tests are in place
     fn new() -> Self {
-        let (map, (player_x, player_y)) = Map::new_dungeon(80, 20, None);
+        let width: u16 = 80;
+        let height: u16 = 20;
+        let (map, (player_x, player_y)) = Map::new_dungeon(width, height, None);
         Self {
             map,
             player: Player {
@@ -223,6 +263,9 @@ impl Game {
                 y: player_y,
             },
             exit: false,
+            visible: vec![false; (width * height) as usize],
+            explored: vec![false; (width * height) as usize],
+            view_radius: 6,
         }
     }
 
@@ -263,6 +306,15 @@ impl Game {
             }
         }
         Ok(())
+    }
+
+    // add player position and view radius to FOV
+    fn fov(&self) -> Fov {
+        Fov {
+            px: self.player.x,
+            py: self.player.y,
+            radius: self.view_radius,
+        }
     }
 }
 
