@@ -207,18 +207,22 @@ struct Fov {
 }
 
 impl Fov {
-    // return every tile on a line from point a to b
+    // return every tile on a line from point a to b, mimick how a ray of light might travel out from the player
+    // and interact with the world
     fn line(&self, x0: u16, y0: u16, x1: u16, y1: u16) -> Vec<(u16, u16)> {
+        // store points in a vector
+        let mut pts = Vec::new();
         // convert coords to i32
         let (mut x, mut y) = (x0 as i32, y0 as i32);
         let (x1, y1) = (x1 as i32, y1 as i32);
-        // get dx and dy (dy is negative)
+        // get dx and dy (dy is negative); distance travelled in x and y direction
         let dx = (x1 - x).abs();
         let dy = -(y1 - y).abs();
-        // step direction
+        // define direction to step through tiles one full tile at a time
         let sx: i32 = if x < x1 { 1 } else { -1 };
         let sy: i32 = if y < y1 { 1 } else { -1 };
 
+        // acts as an accumulator - every x step costs |dy|
         let mut err = dx + dy;
 
         loop {
@@ -226,8 +230,38 @@ impl Fov {
             if x == x1 && y == y1 { break; }
             let e2 = 2 * err;
             if e2 >= dy { err += dy; x += sx; }
-            if e2 <= dx { err += dx; y += sy }
+            if e2 <= dx { err += dx; y += sy; }
         }
+
+        // return points back
+        pts
+    }
+
+    // determine if a player can see something (ie return true if a line from the player to a point is all floor tiles)
+    fn can_see(&self, map: &Map, x: u16, y: u16) -> bool {
+        // determine if a tile is too far to see
+        let dx = x as i32 - self.px as i32;
+        let dy = y as i32 - self.py as i32;
+        if dx * dx + dy * dy > (self.radius as i32) * (self.radius as i32) {
+            return false;
+        }
+
+        // get the line points
+        let pts = self.line(self.px, self.py, x, y);
+        
+        // leave early if the line is too small
+        if pts.len() <= 2 {
+            return true;
+        }
+
+        // iterate the line and skip player and final tile (the target)
+        for &(tx, ty) in &pts[1..pts.len() - 1] {
+            // test each tile for its wall-ness
+            if map.tiles[map.index(tx, ty)] == Tile::Wall {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -256,7 +290,7 @@ impl Game {
         let width: u16 = 80;
         let height: u16 = 20;
         let (map, (player_x, player_y)) = Map::new_dungeon(width, height, None);
-        Self {
+        let mut game = Self {
             map,
             player: Player {
                 x: player_x,
@@ -266,7 +300,9 @@ impl Game {
             visible: vec![false; (width * height) as usize],
             explored: vec![false; (width * height) as usize],
             view_radius: 6,
-        }
+        };
+        game.update_view();
+        game
     }
 
     // apply one move step for the player
@@ -316,6 +352,21 @@ impl Game {
             radius: self.view_radius,
         }
     }
+
+    fn update_view(&mut self) {
+        // clear visible vec
+        self.visible = vec![false; self.map.tiles.len()];
+        
+        for y in 0..self.map.height {
+            for x in 0..self.map.width {
+                if self.fov().can_see(&self.map, x, y) {
+                    let idx = self.map.index(x, y);
+                    self.visible[idx] = true;
+                    self.explored[idx] = true;
+                }
+            }
+        }
+    }
 }
 
 // this draws a frame of the rendering
@@ -334,8 +385,9 @@ fn draw(frame: &mut Frame, game: &Game) {
     // render header
     frame.render_widget(
         Paragraph::new(format!(
-            "Path of Rust - move with WASD, quit with q (terminal {}x{})",
-            area.width, area.height
+            "Path of Rust - move with WASD, quit with q | visible {} | explored {}",
+            game.visible.iter().filter(|v| **v).count(),
+            game.explored.iter().filter(|v| **v).count(),
         )),
         chunks[0],
     );
@@ -350,10 +402,22 @@ fn draw(frame: &mut Frame, game: &Game) {
             let i = game.map.index(x, y);
             let tile = game.map.tiles[i];
 
+            // skip drawing tiles that arent explored yet
+            if !game.explored[i] {
+                continue;
+            }
+
             // set character and color depending on tile type match
             let (ch, color) = match tile {
                 Tile::Wall => ('#', Color::White),
-                Tile::Floor => ('.', Color::DarkGray),
+                Tile::Floor => ('.', Color::Gray),
+            };
+
+            // dim tiles that have been explored but are not visible now
+            let color = if game.visible[i] {
+                color
+            } else {
+                Color::DarkGray
             };
 
             // modify frame
@@ -380,6 +444,7 @@ fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
     while !game.exit {
         terminal.draw(|frame| draw(frame, &game))?;
         game.handle_events()?;
+        game.update_view();
     }
     Ok(())
 }
@@ -405,6 +470,9 @@ mod tests {
             map: Map::new_room(),
             player: Player { x: 1, y: 2 },
             exit: false,
+            visible: vec![false; 800],
+            explored: vec![false; 800],
+            view_radius: 6,
         };
         game.move_player(Direction::Right);
         assert_eq!(game.player.x, 2);
@@ -418,6 +486,9 @@ mod tests {
             map: Map::new_room(),
             player: Player { x: 1, y: 2 },
             exit: false,
+            visible: vec![false; 800],
+            explored: vec![false; 800],
+            view_radius: 6,
         };
 
         game.move_player(Direction::Left);
