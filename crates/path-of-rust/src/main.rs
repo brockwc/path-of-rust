@@ -142,7 +142,7 @@ impl Map {
     }
 
     // generate a dungeon of a given width and height with rooms connected by corridors
-    fn new_dungeon(width: u16, height: u16, seed: Option<u64>) -> (Self, (u16, u16)) {
+    fn new_dungeon(width: u16, height: u16, seed: Option<u64>) -> (Self, (u16, u16), Vec<(u16, u16)>) {
         let tiles = vec![Tile::Wall; (width * height) as usize];
         let mut map = Self {
             width,
@@ -156,6 +156,7 @@ impl Map {
         };
 
         let mut rooms: Vec<Rect> = Vec::new();
+        let mut centers: Vec<(u16, u16)> = Vec::new();
         let max_rooms = 30;
         let min_size = 5;
         let max_size = 8;
@@ -176,6 +177,7 @@ impl Map {
 
                 // get center of new room and last room (if there is one)
                 let (new_x, new_y) = new_room.center();
+                centers.push((new_x, new_y));
 
                 if !rooms.is_empty() {
                     let (prev_x, prev_y) = rooms.last().unwrap().center();
@@ -195,7 +197,7 @@ impl Map {
         }
 
         let player_start = rooms[0].center();
-        (map, player_start)
+        (map, player_start, centers)
     }
 }
 
@@ -227,10 +229,18 @@ impl Fov {
 
         loop {
             pts.push((x as u16, y as u16));
-            if x == x1 && y == y1 { break; }
+            if x == x1 && y == y1 {
+                break;
+            }
             let e2 = 2 * err;
-            if e2 >= dy { err += dy; x += sx; }
-            if e2 <= dx { err += dx; y += sy; }
+            if e2 >= dy {
+                err += dy;
+                x += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                y += sy;
+            }
         }
 
         // return points back
@@ -248,7 +258,7 @@ impl Fov {
 
         // get the line points
         let pts = self.line(self.px, self.py, x, y);
-        
+
         // leave early if the line is too small
         if pts.len() <= 2 {
             return true;
@@ -271,6 +281,19 @@ struct Player {
     y: u16,
 }
 
+// monster line fo sight length
+const MONSTER_SIGHT: u16 = 8;
+
+// temp monster glyphs
+const MONSTER_GLYPHS: [char; 6] = ['r', 'g', 'b', 's', 'k', 'o'];
+
+// struct for single monsters holding the glyph and starting position
+struct Monster {
+    glyph: char,
+    x: u16,
+    y: u16,
+}
+
 // this will store game information between when frames are rendered
 struct Game {
     map: Map,
@@ -282,6 +305,8 @@ struct Game {
     explored: Vec<bool>,
     // player view radius
     view_radius: u16,
+    // all monsters alive in dungeon
+    monsters: Vec<Monster>,
 }
 
 impl Game {
@@ -289,7 +314,18 @@ impl Game {
     fn new() -> Self {
         let width: u16 = 80;
         let height: u16 = 20;
-        let (map, (player_x, player_y)) = Map::new_dungeon(width, height, None);
+        let (map, (player_x, player_y), centers) = Map::new_dungeon(width, height, None);
+        // add one monster to each room
+        let mut monsters: Vec<Monster> = Vec::new();
+        // skip the first room and add monsters to the vec
+        for (i, &(x, y)) in centers.iter().skip(1).enumerate() {
+            monsters.push(Monster {
+                glyph: MONSTER_GLYPHS[i % MONSTER_GLYPHS.len()],
+                x, 
+                y,
+            })
+        }
+
         let mut game = Self {
             map,
             player: Player {
@@ -300,6 +336,7 @@ impl Game {
             visible: vec![false; (width * height) as usize],
             explored: vec![false; (width * height) as usize],
             view_radius: 6,
+            monsters,
         };
         game.update_view();
         game
@@ -356,7 +393,7 @@ impl Game {
     fn update_view(&mut self) {
         // clear visible vec
         self.visible = vec![false; self.map.tiles.len()];
-        
+
         for y in 0..self.map.height {
             for x in 0..self.map.width {
                 if self.fov().can_see(&self.map, x, y) {
@@ -584,8 +621,8 @@ mod tests {
     // This is the test that makes every other procgen bug reproducible.
     #[test]
     fn seeded_dungeon_is_deterministic() {
-        let (map1, p1) = Map::new_dungeon(80, 20, Some(42));
-        let (map2, p2) = Map::new_dungeon(80, 20, Some(42));
+        let (map1, p1, _c1) = Map::new_dungeon(80, 20, Some(42));
+        let (map2, p2, _c2) = Map::new_dungeon(80, 20, Some(42));
 
         assert_eq!(map1.tiles, map2.tiles);
         assert_eq!(p1, p2);
@@ -596,7 +633,7 @@ mod tests {
     // new_dungeon(80, 20, None).
     #[test]
     fn player_starts_on_walkable_tile() {
-        let (map, p) = Map::new_dungeon(80, 20, None);
+        let (map, p, _centers) = Map::new_dungeon(80, 20, None);
         assert!(map.is_walkable(p.0 as i32, p.1 as i32));
     }
 
@@ -606,7 +643,131 @@ mod tests {
     // rooms and corridors.
     #[test]
     fn multiple_rooms_placed() {
-        let (map, _p) = Map::new_dungeon(80, 20, None);
+        let (map, _p, _center) = Map::new_dungeon(80, 20, None);
         assert!(map.tiles.len() > 50);
+    }
+
+    // -- New: Step 4 field of view --------------------------------------------
+
+    // Bresenham on a flat horizontal line: one tile per step from (2,3) to
+    // (8,3). Asserting the whole vec (not just the length) catches sign
+    // errors in the error term that a count-only check would miss. No map
+    // needed - line() only does math.
+    #[test]
+    fn line_walks_shallow_line() {
+        let fov = Fov {
+            px: 2,
+            py: 3,
+            radius: 8,
+        };
+        let pts = fov.line(2, 3, 8, 3);
+
+        assert_eq!(
+            pts,
+            vec![(2, 3), (3, 3), (4, 3), (5, 3), (6, 3), (7, 3), (8, 3)]
+        );
+    }
+
+    // Straight down is the degenerate dx == 0 case: first point is the start,
+    // last is the target, and the count is tile distance + 1. If the error
+    // term blows up when dx is zero this fails loudly instead of looping.
+    #[test]
+    fn line_includes_both_endpoints() {
+        let fov = Fov {
+            px: 2,
+            py: 3,
+            radius: 8,
+        };
+        let pts = fov.line(2, 3, 2, 8);
+
+        assert_eq!(pts.first(), Some(&(2, 3)));
+        assert_eq!(pts.last(), Some(&(2, 8)));
+        assert_eq!(pts.len(), 6);
+    }
+
+    // Open floor between player and target: the sight line is unblocked, so
+    // can_see is true well inside the radius.
+    #[test]
+    fn can_see_through_open_space() {
+        let map = Map::new_room();
+        let fov = Fov {
+            px: 2,
+            py: 3,
+            radius: 8,
+        };
+
+        assert!(fov.can_see(&map, 7, 3));
+    }
+
+    // You can see a wall's face but not the tile behind it. Re-walling (4,3)
+    // goes through a local idx because borrowing map mutably and immutably
+    // in one expression is E0502.
+    #[test]
+    fn wall_blocks_sight() {
+        let mut map = Map::new_room();
+        let idx = map.index(4, 3);
+        map.tiles[idx] = Tile::Wall;
+        let fov = Fov {
+            px: 2,
+            py: 3,
+            radius: 8,
+        };
+
+        assert!(fov.can_see(&map, 4, 3)); // the wall itself is visible
+        assert!(!fov.can_see(&map, 5, 3)); // the tile behind it is not
+    }
+
+    // Explored is a superset of visible: after update_view every visible tile
+    // must also be explored. Loop all tiles and check the implication at each
+    // one. Seeded dungeon keeps the layout reproducible.
+    #[test]
+    fn visible_implies_explored() {
+        let (map, (px, py)) = Map::new_dungeon(40, 20, Some(42));
+        let mut game = Game {
+            map,
+            player: Player { x: px, y: py },
+            exit: false,
+            visible: vec![false; 800],
+            explored: vec![false; 800],
+            view_radius: 6,
+        };
+        game.update_view();
+
+        for i in 0..game.visible.len() {
+            if game.visible[i] {
+                assert!(game.explored[i], "tile {i} visible but not explored");
+            }
+        }
+    }
+
+    // Visibility must refresh after a move: clone visible, move right, update,
+    // and require at least one index to differ. The assert_ne on the position
+    // guards against a wall-bump no-op - if the move fails, identical
+    // visibility is correct and this test would be wrong.
+    #[test]
+    fn moving_updates_visibility() {
+        let (map, (px, py)) = Map::new_dungeon(40, 20, Some(42));
+        let mut game = Game {
+            map,
+            player: Player { x: px, y: py },
+            exit: false,
+            visible: vec![false; 800],
+            explored: vec![false; 800],
+            view_radius: 6,
+        };
+        let seen_before = game.visible.clone();
+
+        game.move_player(Direction::Right);
+        assert_ne!(
+            (game.player.x, game.player.y),
+            (px, py),
+            "move must succeed for this test"
+        );
+        game.update_view();
+
+        assert!(seen_before
+            .iter()
+            .zip(game.visible.iter())
+            .any(|(a, b)| a != b));
     }
 }
