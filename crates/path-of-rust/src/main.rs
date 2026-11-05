@@ -404,6 +404,13 @@ impl Game {
             }
         }
     }
+
+    fn monster_sees_player(&self, m: &Monster) -> bool {
+        // create an fov around the monster
+        let fov = Fov { px: m.x, py: m.y, radius: MONSTER_SIGHT };
+        // check if monster can see player position
+        fov.can_see(&self.map, self.player.x, self.player.y)
+    }
 }
 
 // this draws a frame of the rendering
