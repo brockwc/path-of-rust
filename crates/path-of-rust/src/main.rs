@@ -411,6 +411,11 @@ impl Game {
         // check if monster can see player position
         fov.can_see(&self.map, self.player.x, self.player.y)
     }
+
+    // move monsters one turn at a time in order, if monster cannot see player it does not move, otherwise it moves toward player
+    fn move_monsters(&mut self) {
+        
+    }
 }
 
 // this draws a frame of the rendering
