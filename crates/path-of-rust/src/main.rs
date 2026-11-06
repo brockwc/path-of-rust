@@ -429,7 +429,8 @@ fn draw(frame: &mut Frame, game: &Game) {
     // render header
     frame.render_widget(
         Paragraph::new(format!(
-            "Path of Rust - move with WASD, quit with q | visible {} | explored {}",
+            "Path of Rust - wasd to move, q to quit | monsters {} | visible {} | explored {}",
+            game.monsters.len(),
             game.visible.iter().filter(|v| **v).count(),
             game.explored.iter().filter(|v| **v).count(),
         )),
@@ -470,6 +471,18 @@ fn draw(frame: &mut Frame, game: &Game) {
                 map_area.y + y,
                 ch.to_string(),
                 Style::new().fg(color),
+            );
+        }
+    }
+
+    // ensure monsters in player los are drawn on the board
+    for m in &game.monsters {
+        if game.visible[game.map.index(m.x, m.y)] {
+            frame.buffer_mut().set_string(
+                map_area.x + m.x, 
+                map_area.y + m.y, 
+                m.glyph.to_string(), 
+                Style::new().fg(Color::Red),
             );
         }
     }
