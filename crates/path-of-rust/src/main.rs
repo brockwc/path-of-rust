@@ -528,6 +528,7 @@ fn draw(frame: &mut Frame, game: &Game) {
         .constraints([
             ratatui::prelude::Constraint::Length(1), // header row
             ratatui::prelude::Constraint::Min(0),    // map gets the rest
+            ratatui::prelude::Constraint::Length(4),
         ])
         .split(area);
 
@@ -606,12 +607,24 @@ fn draw(frame: &mut Frame, game: &Game) {
             Style::new().fg(Color::Green),
         );
     }
+
+    // render log messages in new area of screen
+    let log_area = chunks[2];
+    let start = game.log.len().saturating_sub(4);
+    for (row, msg) in game.log[start..].iter().enumerate() {
+        frame.buffer_mut().set_string(
+            log_area.x,
+            log_area.y + row as u16,
+            msg,
+            Style::new(),
+        );
+    }
 }
 
 // main game loop: will redraw and wait up to 50ms for a key press or Esc to quit
 fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
     let mut game = Game::new();
-    while !game.exit {
+    while !game.exit && game.player.hp > 0 {
         terminal.draw(|frame| draw(frame, &game))?;
         game.handle_events()?;
         game.move_monsters();
