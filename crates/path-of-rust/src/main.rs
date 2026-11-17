@@ -303,7 +303,7 @@ struct Monster {
 // combat numbers to handle HP and damage
 const PLAYER_MAX_HP: i32 = 10;
 const MONSTER_MAX_HP: i32 = 4;
-const PLAYER_DAMAGE: i32 = 2;   // unfair lol
+const PLAYER_DAMAGE: i32 = 2; // unfair lol
 const MONSTER_DAMAGE: i32 = 1;
 
 // set a cap for the log
@@ -612,12 +612,9 @@ fn draw(frame: &mut Frame, game: &Game) {
     let log_area = chunks[2];
     let start = game.log.len().saturating_sub(4);
     for (row, msg) in game.log[start..].iter().enumerate() {
-        frame.buffer_mut().set_string(
-            log_area.x,
-            log_area.y + row as u16,
-            msg,
-            Style::new(),
-        );
+        frame
+            .buffer_mut()
+            .set_string(log_area.x, log_area.y + row as u16, msg, Style::new());
     }
 }
 
