@@ -142,7 +142,11 @@ impl Map {
     }
 
     // generate a dungeon of a given width and height with rooms connected by corridors
-    fn new_dungeon(width: u16, height: u16, seed: Option<u64>) -> (Self, (u16, u16), Vec<(u16, u16)>) {
+    fn new_dungeon(
+        width: u16,
+        height: u16,
+        seed: Option<u64>,
+    ) -> (Self, (u16, u16), Vec<(u16, u16)>) {
         let tiles = vec![Tile::Wall; (width * height) as usize];
         let mut map = Self {
             width,
@@ -321,7 +325,7 @@ impl Game {
         for (i, &(x, y)) in centers.iter().skip(1).enumerate() {
             monsters.push(Monster {
                 glyph: MONSTER_GLYPHS[i % MONSTER_GLYPHS.len()],
-                x, 
+                x,
                 y,
             })
         }
@@ -407,14 +411,58 @@ impl Game {
 
     fn monster_sees_player(&self, m: &Monster) -> bool {
         // create an fov around the monster
-        let fov = Fov { px: m.x, py: m.y, radius: MONSTER_SIGHT };
+        let fov = Fov {
+            px: m.x,
+            py: m.y,
+            radius: MONSTER_SIGHT,
+        };
         // check if monster can see player position
         fov.can_see(&self.map, self.player.x, self.player.y)
     }
 
     // move monsters one turn at a time in order, if monster cannot see player it does not move, otherwise it moves toward player
     fn move_monsters(&mut self) {
-        
+        // iterate monsters in collection order so each get one turn
+        for i in 0..self.monsters.len() {
+            // skip monsters that dont see player
+            if !self.monster_sees_player(&self.monsters[i]) {
+                continue;
+            }
+            // determine distance from monster to player (1 or less means hold position)
+            let (mx, my) = (self.monsters[i].x, self.monsters[i].y);
+            let (px, py) = (self.player.x, self.player.y);
+            let (dx, dy) = (px as i32 - mx as i32, py as i32 - my as i32);
+            // distance check
+            if dx.abs() + dy.abs() <= 1 {
+                continue;
+            }
+            // step value setting
+            let step_x = if dx > 0 { 1 } else { -1 };
+            let step_y = if dy > 0 { 1 } else { -1 };
+            // capture the two potential candidate tiles to move to
+            let mut candidates = [
+                (mx as i32 + step_x, my as i32),
+                (mx as i32, my as i32 + step_y),
+            ];
+            // change order of candidates depending on if dy is larger than dx
+            if dx.abs() < dy.abs() {
+                candidates.reverse();
+            }
+            // loop through each candidate
+            for (cx, cy) in candidates {
+                if self.map.is_walkable(cx, cy)
+                    && (cx as u16, cy as u16) != (px, py)
+                    && !self
+                        .monsters
+                        .iter()
+                        .any(|m| (m.x, m.y) == (cx as u16, cy as u16))
+                {
+                    self.monsters[i].x = cx as u16;
+                    self.monsters[i].y = cy as u16;
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -445,9 +493,14 @@ fn draw(frame: &mut Frame, game: &Game) {
     // set map area
     let map_area = chunks[1];
 
+    // clip drawing to whatever fits in the map area, so a terminal shorter or
+    // narrower than the 80x20 map shows the top-left corner instead of panicking
+    let draw_w = map_area.width.min(game.map.width);
+    let draw_h = map_area.height.min(game.map.height);
+
     // render playable area: walls are white "#", floors are dark grey "." loop over map to set
-    for y in 0..game.map.height {
-        for x in 0..game.map.width {
+    for y in 0..draw_h {
+        for x in 0..draw_w {
             // find tile
             let i = game.map.index(x, y);
             let tile = game.map.tiles[i];
@@ -480,24 +533,27 @@ fn draw(frame: &mut Frame, game: &Game) {
         }
     }
 
-    // ensure monsters in player los are drawn on the board
+    // ensure monsters in player los are drawn on the board (clipped like tiles)
     for m in &game.monsters {
-        if game.visible[game.map.index(m.x, m.y)] {
+        if m.x < draw_w && m.y < draw_h && game.visible[game.map.index(m.x, m.y)] {
             frame.buffer_mut().set_string(
-                map_area.x + m.x, 
-                map_area.y + m.y, 
-                m.glyph.to_string(), 
+                map_area.x + m.x,
+                map_area.y + m.y,
+                m.glyph.to_string(),
                 Style::new().fg(Color::Red),
             );
         }
     }
 
-    frame.buffer_mut().set_string(
-        map_area.x + game.player.x,
-        map_area.y + game.player.y,
-        "@",
-        Style::new().fg(Color::Green),
-    );
+    // the player draws last and on top, also clipped to the map area
+    if game.player.x < draw_w && game.player.y < draw_h {
+        frame.buffer_mut().set_string(
+            map_area.x + game.player.x,
+            map_area.y + game.player.y,
+            "@",
+            Style::new().fg(Color::Green),
+        );
+    }
 }
 
 // main game loop: will redraw and wait up to 50ms for a key press or Esc to quit
@@ -506,6 +562,7 @@ fn run(terminal: &mut DefaultTerminal) -> io::Result<()> {
     while !game.exit {
         terminal.draw(|frame| draw(frame, &game))?;
         game.handle_events()?;
+        game.move_monsters();
         game.update_view();
     }
     Ok(())
@@ -535,6 +592,7 @@ mod tests {
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
+            monsters: Vec::new(),
         };
         game.move_player(Direction::Right);
         assert_eq!(game.player.x, 2);
@@ -551,6 +609,7 @@ mod tests {
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
+            monsters: Vec::new(),
         };
 
         game.move_player(Direction::Left);
@@ -747,7 +806,7 @@ mod tests {
     // one. Seeded dungeon keeps the layout reproducible.
     #[test]
     fn visible_implies_explored() {
-        let (map, (px, py)) = Map::new_dungeon(40, 20, Some(42));
+        let (map, (px, py), _centers) = Map::new_dungeon(40, 20, Some(42));
         let mut game = Game {
             map,
             player: Player { x: px, y: py },
@@ -755,6 +814,7 @@ mod tests {
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
+            monsters: Vec::new(),
         };
         game.update_view();
 
@@ -771,7 +831,7 @@ mod tests {
     // visibility is correct and this test would be wrong.
     #[test]
     fn moving_updates_visibility() {
-        let (map, (px, py)) = Map::new_dungeon(40, 20, Some(42));
+        let (map, (px, py), _centers) = Map::new_dungeon(40, 20, Some(42));
         let mut game = Game {
             map,
             player: Player { x: px, y: py },
@@ -779,6 +839,7 @@ mod tests {
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
+            monsters: Vec::new(),
         };
         let seen_before = game.visible.clone();
 
@@ -794,5 +855,172 @@ mod tests {
             .iter()
             .zip(game.visible.iter())
             .any(|(a, b)| a != b));
+    }
+
+    // -- New: Step 5 monsters that chase --------------------------------------
+
+    // A wall between monster and player blocks sight, so the monster must not move.
+    #[test]
+    fn blind_monster_stands_still() {
+        let mut game = Game {
+            map: Map::new_room(),
+            player: Player { x: 2, y: 3 },
+            exit: false,
+            visible: vec![false; 800],
+            explored: vec![false; 800],
+            view_radius: 6,
+            monsters: vec![Monster {
+                glyph: 'r',
+                x: 10,
+                y: 3,
+            }],
+        };
+        let idx = game.map.index(6, 3);
+        game.map.tiles[idx] = Tile::Wall;
+
+        game.move_monsters();
+
+        assert_eq!(game.monsters[0].x, 10);
+        assert_eq!(game.monsters[0].y, 3);
+    }
+
+    // Open floor: the monster closes one tile per call, then holds adjacent.
+    #[test]
+    fn monster_closes_one_tile_per_turn() {
+        let mut game = Game {
+            map: Map::new_room(),
+            player: Player { x: 5, y: 10 },
+            exit: false,
+            visible: vec![false; 800],
+            explored: vec![false; 800],
+            view_radius: 6,
+            monsters: vec![Monster {
+                glyph: 'g',
+                x: 13,
+                y: 10,
+            }],
+        };
+
+        game.move_monsters();
+        assert_eq!((game.monsters[0].x, game.monsters[0].y), (12, 10));
+
+        for _ in 0..7 {
+            game.move_monsters();
+        }
+        assert_eq!((game.monsters[0].x, game.monsters[0].y), (6, 10));
+    }
+
+    // Two monsters converging on the player's row must never share a tile.
+    #[test]
+    fn monster_never_shares_a_tile() {
+        let mut game = Game {
+            map: Map::new_room(),
+            player: Player { x: 10, y: 10 },
+            exit: false,
+            visible: vec![false; 800],
+            explored: vec![false; 800],
+            view_radius: 6,
+            monsters: vec![
+                Monster {
+                    glyph: 'b',
+                    x: 4,
+                    y: 10,
+                },
+                Monster {
+                    glyph: 's',
+                    x: 16,
+                    y: 10,
+                },
+            ],
+        };
+
+        game.move_monsters();
+
+        for a in 0..game.monsters.len() {
+            assert_ne!(
+                (game.monsters[a].x, game.monsters[a].y),
+                (game.player.x, game.player.y),
+                "monster {a} entered the player's tile"
+            );
+            for b in (a + 1)..game.monsters.len() {
+                assert_ne!(
+                    (game.monsters[a].x, game.monsters[a].y),
+                    (game.monsters[b].x, game.monsters[b].y),
+                    "monsters {a} and {b} share a tile"
+                );
+            }
+        }
+    }
+
+    // Ten turns on two identical seeded games must end in identical positions.
+    #[test]
+    fn chase_is_deterministic() {
+        let mut games = Vec::new();
+        for _ in 0..2 {
+            let (map, (px, py), centers) = Map::new_dungeon(40, 20, Some(42));
+            let monsters = centers
+                .iter()
+                .skip(1)
+                .enumerate()
+                .map(|(i, &(x, y))| Monster {
+                    glyph: MONSTER_GLYPHS[i % MONSTER_GLYPHS.len()],
+                    x,
+                    y,
+                })
+                .collect();
+            games.push(Game {
+                map,
+                player: Player { x: px, y: py },
+                exit: false,
+                visible: vec![false; 800],
+                explored: vec![false; 800],
+                view_radius: 6,
+                monsters,
+            });
+        }
+
+        assert!(!games[0].monsters.is_empty());
+        for _ in 0..10 {
+            games[0].move_monsters();
+            games[1].move_monsters();
+        }
+
+        let ends_a: Vec<(u16, u16)> = games[0].monsters.iter().map(|m| (m.x, m.y)).collect();
+        let ends_b: Vec<(u16, u16)> = games[1].monsters.iter().map(|m| (m.x, m.y)).collect();
+        assert_eq!(ends_a, ends_b);
+    }
+
+    // A sealed-in monster sees the adjacent player but both move candidates
+    // are walls: stays put, does not panic.
+    #[test]
+    fn boxed_in_monster_stands_still() {
+        let width: u16 = 10;
+        let height: u16 = 10;
+        let mut map = Map {
+            width,
+            height,
+            tiles: vec![Tile::Wall; 100],
+        };
+        for (fx, fy) in [(5u16, 5u16), (6u16, 6u16)] {
+            let idx = map.index(fx, fy);
+            map.tiles[idx] = Tile::Floor;
+        }
+        let mut game = Game {
+            map,
+            player: Player { x: 6, y: 6 },
+            exit: false,
+            visible: vec![false; 100],
+            explored: vec![false; 100],
+            view_radius: 6,
+            monsters: vec![Monster {
+                glyph: 'k',
+                x: 5,
+                y: 5,
+            }],
+        };
+
+        game.move_monsters();
+
+        assert_eq!((game.monsters[0].x, game.monsters[0].y), (5, 5));
     }
 }
