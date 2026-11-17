@@ -283,6 +283,7 @@ impl Fov {
 struct Player {
     x: u16,
     y: u16,
+    hp: i32,
 }
 
 // monster line fo sight length
@@ -296,7 +297,17 @@ struct Monster {
     glyph: char,
     x: u16,
     y: u16,
+    hp: i32,
 }
+
+// combat numbers to handle HP and damage
+const PLAYER_MAX_HP: i32 = 10;
+const MONSTER_MAX_HP: i32 = 4;
+const PLAYER_DAMAGE: i32 = 2;   // unfair lol
+const MONSTER_DAMAGE: i32 = 1;
+
+// set a cap for the log
+const LOG_CAP: usize = 50;
 
 // this will store game information between when frames are rendered
 struct Game {
@@ -311,6 +322,8 @@ struct Game {
     view_radius: u16,
     // all monsters alive in dungeon
     monsters: Vec<Monster>,
+    // message log
+    log: Vec<String>,
 }
 
 impl Game {
@@ -327,6 +340,7 @@ impl Game {
                 glyph: MONSTER_GLYPHS[i % MONSTER_GLYPHS.len()],
                 x,
                 y,
+                hp: MONSTER_MAX_HP,
             })
         }
 
@@ -335,12 +349,14 @@ impl Game {
             player: Player {
                 x: player_x,
                 y: player_y,
+                hp: PLAYER_MAX_HP,
             },
             exit: false,
             visible: vec![false; (width * height) as usize],
             explored: vec![false; (width * height) as usize],
             view_radius: 6,
             monsters,
+            log: Vec::new(),
         };
         game.update_view();
         game
@@ -360,8 +376,26 @@ impl Game {
         // call is_walkable
         // if true, move there
         if self.map.is_walkable(dest_x, dest_y) {
-            self.player.x = dest_x as u16;
-            self.player.y = dest_y as u16;
+            // find a monster if there is one at the walkable tile
+            if let Some(idx) = self
+                .monsters
+                .iter()
+                .position(|m| (m.x, m.y) == (dest_x as u16, dest_y as u16))
+            {
+                // deal damage
+                self.monsters[idx].hp -= PLAYER_DAMAGE;
+                let glyph = self.monsters[idx].glyph;
+                self.log(format!("You hit the {} for {PLAYER_DAMAGE}.", glyph));
+                // a monster at 0 or below hp dies
+                if self.monsters[idx].hp <= 0 {
+                    self.log(format!("The {} dies.", glyph));
+                    self.monsters.remove(idx);
+                }
+            } else {
+                // if no monster, process the move
+                self.player.x = dest_x as u16;
+                self.player.y = dest_y as u16;
+            }
         }
     }
 
@@ -434,6 +468,16 @@ impl Game {
             let (dx, dy) = (px as i32 - mx as i32, py as i32 - my as i32);
             // distance check
             if dx.abs() + dy.abs() <= 1 {
+                // if player is living, try to hit it
+                if self.player.hp > 0 {
+                    self.player.hp -= MONSTER_DAMAGE;
+                    let glyph = self.monsters[i].glyph;
+                    self.log(format!("The {} hits you for {MONSTER_DAMAGE}.", glyph));
+                    // log death
+                    if self.player.hp <= 0 {
+                        self.log(String::from("You die."));
+                    }
+                }
                 continue;
             }
             // step value setting
@@ -462,6 +506,14 @@ impl Game {
                     break;
                 }
             }
+        }
+    }
+
+    // append a message to the log, dropping the oldest after the cap
+    fn log(&mut self, msg: String) {
+        self.log.push(msg);
+        if self.log.len() > LOG_CAP {
+            self.log.remove(0);
         }
     }
 }
