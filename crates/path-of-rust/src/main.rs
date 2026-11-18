@@ -649,12 +649,13 @@ mod tests {
     fn player_moves_right() {
         let mut game = Game {
             map: Map::new_room(),
-            player: Player { x: 1, y: 2 },
+            player: Player { x: 1, y: 2, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
             monsters: Vec::new(),
+            log: Vec::new(),
         };
         game.move_player(Direction::Right);
         assert_eq!(game.player.x, 2);
@@ -666,12 +667,13 @@ mod tests {
     fn wall_blocks_player() {
         let mut game = Game {
             map: Map::new_room(),
-            player: Player { x: 1, y: 2 },
+            player: Player { x: 1, y: 2, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
             monsters: Vec::new(),
+            log: Vec::new(),
         };
 
         game.move_player(Direction::Left);
@@ -871,12 +873,13 @@ mod tests {
         let (map, (px, py), _centers) = Map::new_dungeon(40, 20, Some(42));
         let mut game = Game {
             map,
-            player: Player { x: px, y: py },
+            player: Player { x: px, y: py, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
             monsters: Vec::new(),
+            log: Vec::new(),
         };
         game.update_view();
 
@@ -896,12 +899,13 @@ mod tests {
         let (map, (px, py), _centers) = Map::new_dungeon(40, 20, Some(42));
         let mut game = Game {
             map,
-            player: Player { x: px, y: py },
+            player: Player { x: 1, y: 2, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
             monsters: Vec::new(),
+            log: Vec::new(),
         };
         let seen_before = game.visible.clone();
 
@@ -926,7 +930,7 @@ mod tests {
     fn blind_monster_stands_still() {
         let mut game = Game {
             map: Map::new_room(),
-            player: Player { x: 2, y: 3 },
+            player: Player { x: 2, y: 3, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 800],
             explored: vec![false; 800],
@@ -935,7 +939,9 @@ mod tests {
                 glyph: 'r',
                 x: 10,
                 y: 3,
+                hp: MONSTER_MAX_HP,
             }],
+            log: Vec::new(),
         };
         let idx = game.map.index(6, 3);
         game.map.tiles[idx] = Tile::Wall;
@@ -951,16 +957,18 @@ mod tests {
     fn monster_closes_one_tile_per_turn() {
         let mut game = Game {
             map: Map::new_room(),
-            player: Player { x: 5, y: 10 },
+            player: Player { x: 5, y: 10, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 800],
             explored: vec![false; 800],
             view_radius: 6,
             monsters: vec![Monster {
-                glyph: 'g',
+                glyph: 'r',
                 x: 13,
                 y: 10,
+                hp: MONSTER_MAX_HP,
             }],
+            log: Vec::new(),
         };
 
         game.move_monsters();
@@ -977,7 +985,7 @@ mod tests {
     fn monster_never_shares_a_tile() {
         let mut game = Game {
             map: Map::new_room(),
-            player: Player { x: 10, y: 10 },
+            player: Player { x: 2, y: 3, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 800],
             explored: vec![false; 800],
@@ -987,13 +995,16 @@ mod tests {
                     glyph: 'b',
                     x: 4,
                     y: 10,
+                    hp: MONSTER_MAX_HP,
                 },
                 Monster {
                     glyph: 's',
                     x: 16,
                     y: 10,
+                    hp: MONSTER_MAX_HP,
                 },
             ],
+            log: Vec::new(),
         };
 
         game.move_monsters();
@@ -1028,16 +1039,18 @@ mod tests {
                     glyph: MONSTER_GLYPHS[i % MONSTER_GLYPHS.len()],
                     x,
                     y,
+                    hp: MONSTER_MAX_HP,
                 })
                 .collect();
             games.push(Game {
                 map,
-                player: Player { x: px, y: py },
+                player: Player { x: px, y: py, hp: PLAYER_MAX_HP },
                 exit: false,
                 visible: vec![false; 800],
                 explored: vec![false; 800],
                 view_radius: 6,
                 monsters,
+                log: Vec::new(),
             });
         }
 
@@ -1069,7 +1082,7 @@ mod tests {
         }
         let mut game = Game {
             map,
-            player: Player { x: 6, y: 6 },
+            player: Player { x: 6, y: 6, hp: PLAYER_MAX_HP },
             exit: false,
             visible: vec![false; 100],
             explored: vec![false; 100],
@@ -1078,7 +1091,9 @@ mod tests {
                 glyph: 'k',
                 x: 5,
                 y: 5,
+                hp: MONSTER_MAX_HP,
             }],
+            log: Vec::new(),
         };
 
         game.move_monsters();
