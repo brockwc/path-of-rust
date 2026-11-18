@@ -423,6 +423,7 @@ impl Game {
                 self.log(format!("You hit the {} for {PLAYER_DAMAGE}.", glyph));
                 // a monster at 0 or below hp dies
                 if self.monsters[idx].hp <= 0 {
+                    self.kills += 1;
                     self.log(format!("The {} dies.", glyph));
                     self.monsters.remove(idx);
                 }
@@ -551,6 +552,13 @@ impl Game {
             self.log.remove(0);
         }
     }
+
+    // set the current score
+    fn score(&self) -> u32 {
+        (self.depth - 1) * DEPTH_SCORE + self.kills * KILL_SCORE
+    }
+
+    // 
 }
 
 // this draws a frame of the rendering
