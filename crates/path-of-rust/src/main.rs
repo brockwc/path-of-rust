@@ -24,6 +24,7 @@ enum Direction {
 enum Tile {
     Wall,
     Floor,
+    StairsDown,
 }
 
 // room placement stuff
@@ -100,7 +101,7 @@ impl Map {
         if x >= 0 && x < w && y >= 0 && y < h {
             let (x, y) = (x as u16, y as u16);
             let tile = self.tiles[self.index(x, y)];
-            tile == Tile::Floor
+            matches!(tile, Tile::Floor | Tile::StairsDown)
         } else {
             false
         }
@@ -198,6 +199,13 @@ impl Map {
 
                 rooms.push(new_room);
             }
+        }
+
+        // set stairs down to next floor in the last room
+        if let Some(last) = rooms.last() {
+            let (sx, sy) = last.center();
+            let idx = map.index(sx, sy);
+            map.tiles[idx] = Tile::StairsDown;
         }
 
         let player_start = rooms[0].center();
@@ -567,6 +575,7 @@ fn draw(frame: &mut Frame, game: &Game) {
             let (ch, color) = match tile {
                 Tile::Wall => ('#', Color::White),
                 Tile::Floor => ('.', Color::Gray),
+                Tile::StairsDown => ('\\', Color::Cyan),
             };
 
             // dim tiles that have been explored but are not visible now
