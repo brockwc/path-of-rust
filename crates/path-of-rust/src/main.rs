@@ -317,6 +317,21 @@ const MONSTER_DAMAGE: i32 = 1;
 // set a cap for the log
 const LOG_CAP: usize = 50;
 
+// depth to reach to win game
+const MAX_DEPTH: u32 = 3;
+
+// score points per level and per kill
+const DEPTH_SCORE: u32 = 10;
+const KILL_SCORE: u32 = 5;
+
+// game is in one of three states at all times
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum GameState {
+    Playing,
+    Won,
+    Last,
+}
+
 // this will store game information between when frames are rendered
 struct Game {
     map: Map,
@@ -332,6 +347,14 @@ struct Game {
     monsters: Vec<Monster>,
     // message log
     log: Vec<String>,
+    // current depth
+    depth: u32,
+    // monsters killed
+    kills: u32,
+    // playing until won or lost
+    state: GameState,
+    // set by the r key after a win or a loss (will rebuild the game if you want to play again)
+    reset: bool,
 }
 
 impl Game {
@@ -365,6 +388,10 @@ impl Game {
             view_radius: 6,
             monsters,
             log: Vec::new(),
+            depth: 1, 
+            kills: 0, 
+            state: GameState::Playing, 
+            reset: false,
         };
         game.update_view();
         game
